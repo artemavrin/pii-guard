@@ -504,7 +504,7 @@ async def complete_chat_json(
     masked_answer = _masked_answer(answer) if echo_data is not None else None
     gateway.issued_ids.add(session.session_id, upstream_ids(answer))
     observe(session, "chat", answer)
-    report = restore_completion(session, answer)
+    report = restore_completion(gateway.restoring(session, language), answer)
     stats.unresolved = len(report.unresolved)
     out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
     if echo_data is not None:
@@ -535,7 +535,7 @@ def complete_chat_stream(
     echo_data: dict[str, Any] | None,
 ) -> tuple[Response, RequestStats]:
     restorer = SseRestorer(
-        session,
+        gateway.restoring(session, language),
         opaque=OpaqueStream(session, "chat"),
         on_ids=lambda ids: gateway.issued_ids.add(session.session_id, ids),
         keep_restored_tools=trace.full,

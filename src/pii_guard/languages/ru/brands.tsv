@@ -1,0 +1,9 @@
+# The country's well-known company and brand names (pii_guard/detect/ner_orgs.py;
+# docs/languages.md). One name per line, as it is written; case is ignored. An NER PERSON
+# span that is only one of these names (plus a suffix the inflection matcher allows) becomes
+# ORGANIZATION, which policy keeps. Global names (Meta, Google, OpenAI ...) are already in
+# pii_guard/languages/brands.tsv. Leave out names that are also given names or surnames.
+# Uncomment the pack's ``brands=`` line in __init__.py once there is a line here.
+# Examples (languages/de/brands.tsv is complete):
+# Deutsche Bahn
+# Lufthansa

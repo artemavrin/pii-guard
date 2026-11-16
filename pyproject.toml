@@ -84,6 +84,11 @@ hosted-azure = [
     "azure-identity>=1.27.0",
     "azure-storage-blob>=12.31.0",
 ]
+ru = [
+    "pymorphy3>=2.0.6",
+    "pymorphy3-dicts-ru>=2.4.417150.4580142",
+    "pytrovich>=0.2.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -152,6 +157,12 @@ max-statements = 60
 "examples/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
 "scripts/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
 "training/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
+# Russian text: every Cyrillic letter that looks like a Latin one is "ambiguous" to RUF001-003.
+"src/pii_guard/languages/ru/**" = ["RUF001", "RUF002", "RUF003"]
+"eval/fixtures/smoke/ru.py" = ["RUF001", "RUF002", "RUF003"]
+# Diagnostic and spike scripts of the fork, in Russian; not part of the package.
+"docs/ru/**" = ["ALL"]
+"tests/languages/test_ru*.py" = ["RUF001", "RUF002", "RUF003", "S101", "SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915", "ASYNC"]
 # Legacy async-timeout exemptions in src/:
 "src/pii_guard/detect/stack.py" = ["ASYNC109"]
 "src/pii_guard/eval/baselines/workers/llm_guard_worker.py" = ["SLF001"]

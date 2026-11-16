@@ -439,7 +439,7 @@ class ResponsesGateway:
         masked_output = _masked_output(answer) if echo else None
         observe(session, "responses", answer)
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
-        report = restore_response(session, answer)
+        report = restore_response(self.gateway.restoring(session, language), answer)
         stats.unresolved = len(report.unresolved)
         out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
         if echo:
@@ -468,7 +468,7 @@ class ResponsesGateway:
     ) -> tuple[Response, RequestStats]:
         issued = self.gateway.issued_ids
         restorer = ResponsesSseRestorer(
-            session,
+            self.gateway.restoring(session, language),
             on_ids=lambda ids: issued.add(session.session_id, ids),
             opaque=OpaqueStream(session, "responses"),
         )

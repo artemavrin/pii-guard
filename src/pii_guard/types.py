@@ -96,6 +96,9 @@ class Span:
     detector: str
     forced_by: str | None = field(default=None, compare=False)
     subtype: str | None = field(default=None, compare=False)
+    # The vault entry this span belongs to, when a language layer has resolved it (the
+    # Russian person layer: every case form of a person keyed on one lemma). Not public.
+    lemma: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.entity_type, EntityType):

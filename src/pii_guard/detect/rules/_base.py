@@ -100,10 +100,10 @@ def _reference_word() -> str:
 
 _REFERENCE_BEFORE_TEMPLATE = (
     r"(?:(?i:(?<!\w)(?:{words})"
-    r"(?:[ \t]*(?:number|no|nr|num|id|sz[áa]m|sz[áa]ma|nummer|numer)(?!\w)\.?)?)"
-    r"[ \t:#=()\-]*(?:[A-Z]{{1,6}}[-/#][ \t]?)?"
+    r"(?:[ \t]*(?:number|no|nr|num|id|sz[áa]m|sz[áa]ma|nummer|numer|номер\w*|ном)(?!\w)\.?)?)"
+    r"[ \t:#№=()\-]*(?:[A-Z]{{1,6}}[-/#][ \t]?)?"
     r"|(?<![\w-])[A-Z]{{1,6}}-|#[ \t]?"
-    r"|(?:[$€£¥]|(?<!\w)(?:USD|EUR|GBP|CHF|HUF|Ft|forint|PLN|zł)(?!\w)\.?)[ \t]?)$"
+    r"|(?:[$€£¥₽]|(?<!\w)(?:USD|EUR|GBP|CHF|HUF|Ft|forint|PLN|zł|RUB|руб)(?!\w)\.?)[ \t]?)$"  # noqa: RUF001
 )
 
 

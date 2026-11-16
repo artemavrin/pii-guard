@@ -32,7 +32,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from fastapi.responses import StreamingResponse
@@ -72,7 +72,7 @@ from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mod
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
 from pii_guard.gateway.opaque_ids import IssuedIds
 from pii_guard.gateway.outbound import OutboundCheckFailedError, check_outbound
-from pii_guard.gateway.placeholder_note import needs_note
+from pii_guard.gateway.placeholder_note import note_text
 from pii_guard.gateway.request import (
     CollectedTexts,
     ImageSlot,
@@ -87,9 +87,16 @@ from pii_guard.gateway.sessions import (
     resolve_session,
 )
 from pii_guard.gateway.trace import CallTrace
+from pii_guard.languages import primary_language
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
-from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
+from pii_guard.types import (
+    DetectionError,
+    EntityType,
+    PayloadTooLargeError,
+    PiiGuardError,
+    Span,
+)
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.masking import (
@@ -508,12 +515,13 @@ class Gateway:
         body: dict[str, Any],
         session: VaultSession,
         stats: RequestStats,
-        add_note: Callable[[dict[str, Any]], None],
+        add_note: Callable[[dict[str, Any], str], None],
     ) -> bytes:
         """The masked body as sent upstream, with the placeholder note if it needs one."""
         text = dumps_utf8(body)
-        if self.config.placeholder_note and needs_note(text, session):
-            add_note(body)
+        note = note_text(text, session) if self.config.placeholder_note else None
+        if note is not None:
+            add_note(body, note)
             stats.note = True
             text = dumps_utf8(body)
         return text.encode("utf-8")
@@ -768,14 +776,35 @@ class Gateway:
                 slot.write("")
         texts = [slot.text for slot in slots]
         spans = widen_request(texts, spans, session.confirmed_values(WIDENED_TYPES), language)
+        russian = primary_language(language) == "ru"
+        if russian:  # one person = one entry; Персона labels upstream (docs/ru/README.md)
+            from pii_guard.languages.ru import persons
+
+            spans = persons.prepare(
+                texts, spans, session.confirmed_values((EntityType.PERSON,)), session.session_id
+            )
         results = [
             session.mask_with_report(text, found, language=language)
             for text, found in zip(texts, spans, strict=True)
         ]
-        return [
-            session.mask(r.text, [], language=language, remask=True, since=r.generation)
+        finals = [
+            session.mask_with_report(r.text, [], language=language, remask=True, since=r.generation)
             for r in results
         ]
+        if not russian:
+            return [f.text for f in finals]
+        return [
+            persons.render(f.text, text, r, f, session.session_id)
+            for f, text, r in zip(finals, texts, results, strict=True)
+        ]
+
+    def restoring(self, session: VaultSession, language: str) -> VaultSession:
+        """The session restore paths use: Russian adds ``Персона`` labels (docs/ru)."""
+        if primary_language(language) != "ru":
+            return session
+        from pii_guard.languages.ru.persons import LabelSession
+
+        return cast(VaultSession, LabelSession(session))
 
     _mask = mask
 

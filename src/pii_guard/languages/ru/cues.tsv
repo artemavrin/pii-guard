@@ -1,0 +1,84 @@
+# Cue words for context-cued numbers (languages/cues.py); format in hu/cues.tsv.
+# A number right after a cue is masked as its type even when its check digit fails; a "-"
+# cue names a number that is not personal data and ends the window. Russian nouns change
+# their ending by case: a trailing "*" covers the endings that keep the stem; forms whose
+# stem changes are listed one by one. Matching ignores case and accents (ё = е).
+телефон*	PHONE
+тел.	PHONE
+тел	PHONE
+моб.	PHONE
+мобильн*	PHONE
+сотов*	PHONE
+номер телефона	PHONE
+звонить	PHONE
+whatsapp	PHONE
+номер карты	BANK_ACCOUNT
+номеру карты	BANK_ACCOUNT
+карта	BANK_ACCOUNT
+карты	BANK_ACCOUNT
+карту	BANK_ACCOUNT
+картой	BANK_ACCOUNT
+карте	BANK_ACCOUNT
+р/с	BANK_ACCOUNT
+р/сч	BANK_ACCOUNT
+расчетный счет	BANK_ACCOUNT
+расчетного счета	BANK_ACCOUNT
+расчетному счету	BANK_ACCOUNT
+расч. счет	BANK_ACCOUNT
+лицевой счет	BANK_ACCOUNT
+лицевого счета	BANK_ACCOUNT
+л/с	BANK_ACCOUNT
+счет получателя	BANK_ACCOUNT
+номер счета	BANK_ACCOUNT
+к/с	BANK_ACCOUNT
+корр. счет	BANK_ACCOUNT
+корреспондентский счет	BANK_ACCOUNT
+ИНН	ID_DOCUMENT
+СНИЛС	ID_DOCUMENT
+ОГРНИП	ID_DOCUMENT
+ОГРН	ID_DOCUMENT
+паспорт*	ID_DOCUMENT
+серия и номер	ID_DOCUMENT
+серия	ID_DOCUMENT
+серии	ID_DOCUMENT
+загранпаспорт*	ID_DOCUMENT
+водительское удостоверение	ID_DOCUMENT
+водительского удостоверения	ID_DOCUMENT
+полис*	ID_DOCUMENT
+ОМС	ID_DOCUMENT
+ЕНП	ID_DOCUMENT
+свидетельств*	ID_DOCUMENT
+удостоверени*	ID_DOCUMENT
+номер документа	ID_DOCUMENT
+заказ*	-
+номер заказа	-
+артикул*	-
+партия	-
+партии	-
+накладн*	-
+счет-фактур*	-
+счет на оплату	-
+счета на оплату	-
+договор*	-
+акт	-
+акта	-
+протокол*	-
+заявк*	-
+обращени*	-
+тикет*	-
+трек*	-
+отправлени*	-
+посылк*	-
+БИК	-
+КПП	-
+ОКПО	-
+ОКВЭД	-
+ОКТМО	-
+индекс	-
+сумм*	-
+итого	-
+остаток	-
+баланс	-
+и	-
+или	-
+либо	-

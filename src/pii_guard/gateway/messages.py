@@ -495,7 +495,7 @@ class MessagesGateway:
         observe(session, "messages", answer)
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         try:
-            report = restore_message(session, answer)
+            report = restore_message(self.gateway.restoring(session, language), answer)
         except ValueError:  # a tool_use input that no longer parses: never half-restored
             stats.log("upstream_invalid")
             raise UpstreamError("upstream tool input could not be restored") from None
@@ -526,7 +526,7 @@ class MessagesGateway:
     ) -> tuple[Response, RequestStats]:
         issued = self.gateway.issued_ids
         restorer = MessagesSseRestorer(
-            session,
+            self.gateway.restoring(session, language),
             on_ids=lambda ids: issued.add(session.session_id, ids),
             opaque=OpaqueStream(session, "messages"),
         )

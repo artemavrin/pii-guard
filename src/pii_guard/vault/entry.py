@@ -698,6 +698,10 @@ def plan_spans(
     # Lemma -> the distinct surface forms that can be read as it ("Eleknek", "Eleket").
     votes: dict[tuple[EntityType, str], set[str]] = {}
     for index, span in enumerate(ordered):
+        if span.lemma is not None:  # resolved by a language layer: the whole span, this lemma
+            plans.append(_Plan(span, span.lemma, len(span.text)))
+            confirmed.add((span.entity_type, _value_key(span.entity_type, span.lemma)))
+            continue
         next_start = ordered[index + 1].start if index + 1 < len(ordered) else len(text)
         in_word = _plan_in_word(text, span, matcher, confirmed, next_start)
         if in_word is not None:

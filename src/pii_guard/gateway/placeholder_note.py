@@ -27,6 +27,7 @@ __all__ = [
     "add_messages_note",
     "add_responses_note",
     "needs_note",
+    "note_text",
 ]
 
 #: Response header set (``added``) when the note went upstream with the request.
@@ -49,14 +50,26 @@ def needs_note(payload: str, session: VaultSession) -> bool:
     return session.issued_any(payload)
 
 
-def add_chat_note(body: dict[str, Any]) -> None:
+def note_text(payload: str, session: VaultSession) -> str | None:
+    """The note ``payload`` (the masked body) needs: the placeholder note if it holds an
+    issued placeholder, the Russian label note if it holds ``Персона_…`` labels (docs/ru)."""
+    notes = [PLACEHOLDER_NOTE] if needs_note(payload, session) else []
+    from pii_guard.languages.ru.persons import NOTE as RU_NOTE
+    from pii_guard.languages.ru.persons import has_labels
+
+    if has_labels(payload):
+        notes.append(RU_NOTE)
+    return "\n\n".join(notes) or None
+
+
+def add_chat_note(body: dict[str, Any], note: str = PLACEHOLDER_NOTE) -> None:
     """Put the note in front of a Chat Completions ``messages`` list."""
     messages = body.get("messages")
     if isinstance(messages, list):
-        messages.insert(0, {"role": "system", "content": PLACEHOLDER_NOTE})
+        messages.insert(0, {"role": "system", "content": note})
 
 
-def add_responses_note(body: dict[str, Any]) -> None:
+def add_responses_note(body: dict[str, Any], note: str = PLACEHOLDER_NOTE) -> None:
     """Put the note in front of a Responses request's ``instructions``.
 
     ``instructions`` is the Responses API's system prompt; an absent or empty one becomes the
@@ -64,12 +77,12 @@ def add_responses_note(body: dict[str, Any]) -> None:
     """
     instructions = body.get("instructions")
     if isinstance(instructions, str) and instructions:
-        body["instructions"] = f"{PLACEHOLDER_NOTE}\n\n{instructions}"
+        body["instructions"] = f"{note}\n\n{instructions}"
     elif instructions is None or instructions == "":
-        body["instructions"] = PLACEHOLDER_NOTE
+        body["instructions"] = note
 
 
-def add_messages_note(body: dict[str, Any]) -> None:
+def add_messages_note(body: dict[str, Any], note: str = PLACEHOLDER_NOTE) -> None:
     """Put the note in front of a Messages API request's ``system`` (LAB-1605).
 
     A string ``system`` gets the note as a first paragraph; a list of text blocks gets it as
@@ -79,8 +92,8 @@ def add_messages_note(body: dict[str, Any]) -> None:
     """
     system = body.get("system")
     if isinstance(system, str) and system:
-        body["system"] = f"{PLACEHOLDER_NOTE}\n\n{system}"
+        body["system"] = f"{note}\n\n{system}"
     elif isinstance(system, list) and system:
-        system.insert(0, {"type": "text", "text": PLACEHOLDER_NOTE})
+        system.insert(0, {"type": "text", "text": note})
     elif system is None or system == "" or system == []:
-        body["system"] = PLACEHOLDER_NOTE
+        body["system"] = note

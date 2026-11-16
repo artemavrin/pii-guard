@@ -118,6 +118,20 @@ def _restorations(
         yield _Restored(match.start(), cursor, placeholder, match.group(1), restored, kept)
 
 
+def _restore_labels(session: Any, text: str) -> str:
+    """A language layer's own labels first (Russian ``Персона_…``, docs/ru/README.md)."""
+    restore = getattr(session, "restore_labels", None)
+    return restore(text) if restore is not None else text
+
+
+def _label_hold(adapter: Any, session: Any) -> None:
+    """Also hold back a split language label in a streamed tool input or arguments."""
+    inner = getattr(session, "restore_labels", None) and getattr(session, "hold_from", None)
+    if inner is not None:
+        own = type(adapter).hold_from
+        adapter.hold_from = lambda buffer: min(own(buffer), inner(buffer))
+
+
 def restore_text(
     session: VaultSession, text: str, budget: RestoreBudget | None = None
 ) -> tuple[str, list[Span], tuple[str, ...]]:
@@ -128,6 +142,7 @@ def restore_text(
     """
     if budget is None:
         budget = session.restore_budget()
+    text = _restore_labels(session, text)
     parts: list[str] = []
     spans: list[Span] = []
     unresolved: dict[str, None] = {}
@@ -362,6 +377,7 @@ class ToolInputSession:
         self._session = session
         self._budget = budget
         self._shell = ShellText()
+        _label_hold(self, session)
 
     def restore_budget(self) -> RestoreBudget:
         return self._budget or self._session.restore_budget()
@@ -372,6 +388,7 @@ class ToolInputSession:
 
     def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
         budget = budget or self.restore_budget()
+        text = _restore_labels(self._session, text)
         return _restore_escaped(
             self._session,
             text,
@@ -418,12 +435,14 @@ class JsonEscapingSession:
         self._session = session
         self._budget = budget
         self._context = ArgumentsContext()
+        _label_hold(self, session)
 
     def restore_budget(self) -> RestoreBudget:
         return self._budget or self._session.restore_budget()
 
     def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
         budget = budget or self.restore_budget()
+        text = _restore_labels(self._session, text)
         return _restore_escaped(
             self._session,
             text,

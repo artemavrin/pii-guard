@@ -104,6 +104,9 @@ _NEGATIVE = (
     "zamowien*", "zlecen*", "faktur*", "paragon*", "przesyłk*", "przesylk*", "przesyłek",
     "paczk*", "rezerwacj*", "zgłoszen*", "zgloszen*", "transakcj*", "sledzeni*", "sygn",
     "sygnatur*", "artykuł*", "artykul*",
+    "заказ*", "артикул*", "накладн*", "счет-фактур*", "заявк*", "обращени*", "тикет*",
+    "трек*", "отправлени*", "посылк*", "партия", "партии", "бик", "кпп", "окпо", "оквэд",
+    "октмо",
 )  # fmt: skip
 
 #: Words of a pack cue too generic to count on their own ("account number", "TAJ szám").
@@ -111,6 +114,7 @@ _NEGATIVE = (
 #: numero, nummer, număr), so those packs need no edit here (LAB-1773).
 _GENERIC = frozenset(
     {"number", "nummer", "szam", "szama", "numer", "numero", "numar", "numarul"}
+    | {"номер", "номера", "номеру", "номером", "номере"}
     | {"mit", "der", "the", "ending"}
 )
 
@@ -128,6 +132,7 @@ _WORD_OR_NUMBER_RE = re.compile(r"[^\W\d_]+|\d+")
 _FILLER = frozenset(
     {"number", "no", "nr", "num", "nummer", "numer", "szam", "szama", "id"}
     | {"numero", "numar", "numarul", "n", "nº"}
+    | {"номер", "номера", "номеру", "номером", "номере", "ном"}
 )
 #: A negative word counts as a value's label only this close (in words) before it.
 _LABEL_WORDS = 2

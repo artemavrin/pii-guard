@@ -1,0 +1,30 @@
+# Reference words: labels that make a number a business number, not personal data
+# (languages/references.py). One label per line, a trailing "*" takes suffixes; second
+# column: both (default), rules, ner or weak (format in pl/references.tsv).
+заказ*
+артикул*
+накладн*
+счет-фактур*
+счет на оплату	rules
+счета на оплату	rules
+договор*	rules
+акт	rules
+акта	rules
+протокол*	rules
+заявк*
+обращени*
+тикет*
+трек*
+отправлени*
+посылк*
+партия
+партии
+БИК
+КПП
+ОКПО
+ОКВЭД
+ОКТМО
+сумм*	weak
+итого	weak
+остаток	weak
+баланс	weak
