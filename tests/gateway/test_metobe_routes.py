@@ -129,3 +129,24 @@ def test_dry_run_prints_the_send_labels_and_registers_nothing(client: TestClient
         e["placeholder"] for e in preview["entities"]
     }
     assert _restore(client, "metobe_m6", [{"kind": "text", "text": email}])[0]["text"] == EMAIL
+
+
+def test_keep_and_block_types_for_one_request(client: TestClient) -> None:
+    messages = [{"role": "user", "content": f"Передай Ольге Петровне, почта {EMAIL}."}]
+    response = client.post(
+        "/s/metobe_m7/v1/chat/mask", json={"messages": messages, "keep": ["EMAIL"]}, headers=RU
+    )
+    assert response.status_code == 200, response.text
+    out = response.json()
+    assert EMAIL in json.dumps(out["body"], ensure_ascii=False)
+    assert {e["type"] for e in out["entities"]} == {"PERSON"}
+    blocked = client.post(
+        "/s/metobe_m8/v1/chat/mask", json={"messages": messages, "block": ["EMAIL"]}, headers=RU
+    )
+    assert blocked.status_code == 422
+    assert blocked.json()["error"]["code"] == "blocked_by_policy"
+    assert EMAIL not in blocked.text
+    bad = client.post(
+        "/s/metobe_m9/v1/chat/mask", json={"messages": messages, "keep": ["NOPE"]}, headers=RU
+    )
+    assert bad.status_code == 400

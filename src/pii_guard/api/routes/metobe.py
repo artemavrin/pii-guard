@@ -7,6 +7,8 @@ The app keeps its own provider client and runs the gateway's pipeline in two hal
   person layer, JSON tool results, outbound re-check and placeholder note — but returned
   instead of sent. ``entities`` lists every placeholder in the masked body with its type and
   original value, for the app's "what the model saw" view.
+  ``"keep"`` and ``"block"`` (lists of entity types) are the app's policy for this request: kept
+  types go as they are, a blocked type refuses the request (``blocked_by_policy``, 422).
   With ``"dry": true`` the body is masked in a fork of the session (a draft's preview): the
   same placeholders a send would print, nothing registered.
 - ``POST /s/<session>/v1/chat/restore``: the model's answer back to original values —
@@ -38,6 +40,7 @@ from pii_guard.gateway.sessions import path_session
 from pii_guard.gateway.trace import CallTrace, new_request_id
 from pii_guard.languages.ru.names import LABEL_RE
 from pii_guard.observability import RequestTimer
+from pii_guard.types import EntityType
 from pii_guard.vault import PLACEHOLDER_RE, StreamUnmasker
 
 __all__ = ["router"]
@@ -53,6 +56,18 @@ def _strings(value: Any) -> list[str]:
     if isinstance(value, dict):
         return [s for item in value.values() for s in _strings(item)]
     return []
+
+
+def _types(value: Any) -> frozenset[EntityType]:
+    """Entity type names from the app; anything unknown is a bad request, never ignored."""
+    if value is None:
+        return frozenset()
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise InvalidChatRequestError("keep and block must be lists of entity types")
+    try:
+        return frozenset(EntityType(v) for v in value)
+    except ValueError:
+        raise InvalidChatRequestError("unknown entity type in keep or block") from None
 
 
 def _call_ids(body: dict[str, Any]) -> list[str]:
@@ -102,6 +117,9 @@ async def chat_mask(request: Request) -> dict[str, Any]:
     # A preview of a draft: masked in a fork of the session, so the placeholders are the ones a
     # send would print, and nothing is registered unless the message is sent.
     dry = bool(body.pop("dry", False))
+    # The app's settings for this request: types to leave as they are, types that stop it.
+    keep = _types(body.pop("keep", None))
+    block = _types(body.pop("block", None))
     body.setdefault("model", "gpt-4o")
     request.state.pii_guard_request_id = new_request_id()
     timer = RequestTimer(received_at)
@@ -133,6 +151,8 @@ async def chat_mask(request: Request) -> dict[str, Any]:
             stats=stats,
             check_payload=lambda _payload, _images: None,
             dry=dry,
+            keep=keep,
+            block=block,
         )
         return (session, payload), stats
 

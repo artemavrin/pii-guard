@@ -94,6 +94,13 @@ class InvalidChatRequestError(PiiGuardError):
     status_code = 400
 
 
+class BlockedByPolicyError(PiiGuardError):
+    """The request holds personal data of a type the caller said must not go out at all."""
+
+    code = "blocked_by_policy"
+    status_code = 422
+
+
 class UnsupportedContentError(PiiGuardError):
     """Content the gateway can't mask yet. Rejected, never passed through."""
 

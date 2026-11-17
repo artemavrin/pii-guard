@@ -33,7 +33,12 @@ from pii_guard.gateway.opaque_reasoning import (
 )
 from pii_guard.gateway.outbound import OUTBOUND_CHECK_HEADER, OutboundCheck
 from pii_guard.gateway.placeholder_note import NOTE_HEADER, add_chat_note
-from pii_guard.gateway.request import CollectedTexts, TextSlot, collect_texts
+from pii_guard.gateway.request import (
+    BlockedByPolicyError,
+    CollectedTexts,
+    TextSlot,
+    collect_texts,
+)
 from pii_guard.gateway.restore import restore_completion
 from pii_guard.gateway.sessions import SESSION_HEADER, SESSION_SOURCE_HEADER, SessionSource
 from pii_guard.gateway.stream import (
@@ -52,7 +57,7 @@ from pii_guard.gateway.tool_names import (
 )
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import RequestTimer
-from pii_guard.types import PayloadTooLargeError, PiiGuardError, Span
+from pii_guard.types import EntityType, PayloadTooLargeError, PiiGuardError, Span
 from pii_guard.vault import (
     PLACEHOLDER_RE,
     UnmaskOutputTooLargeError,
@@ -380,6 +385,8 @@ async def mask_chat_request(
     stats: RequestStats,
     check_payload: Callable[[bytes, int], None],
     dry: bool = False,
+    keep: frozenset[EntityType] = frozenset(),
+    block: frozenset[EntityType] = frozenset(),
 ) -> tuple[VaultSession, bytes, list[list[Span]], float]:
     session, created = gateway.session(headers, body, path_session, stats, trace)
     # A dry run (Metobe's preview of a draft) masks in a fork: the same placeholders, and nothing
@@ -408,6 +415,12 @@ async def mask_chat_request(
             )
             issued = gateway.issued_ids.of(working.session_id)
             spans = without_opaque_ids(collected.slots, spans, issued)
+            # The caller's own policy for this request (Metobe's settings): a blocked type stops it,
+            # a kept type goes as it is.
+            if block and any(s.entity_type in block for found in spans for s in found):
+                raise BlockedByPolicyError("the request holds a type that must not be sent")
+            if keep:
+                spans = [[s for s in found if s.entity_type not in keep] for found in spans]
         generation = working.generation
         before = _counts_of(working)
         with timer.span("mask"):
