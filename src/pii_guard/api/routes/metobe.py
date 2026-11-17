@@ -7,6 +7,8 @@ The app keeps its own provider client and runs the gateway's pipeline in two hal
   person layer, JSON tool results, outbound re-check and placeholder note — but returned
   instead of sent. ``entities`` lists every placeholder in the masked body with its type and
   original value, for the app's "what the model saw" view.
+  With ``"dry": true`` the body is masked in a fork of the session (a draft's preview): the
+  same placeholders a send would print, nothing registered.
 - ``POST /s/<session>/v1/chat/restore``: the model's answer back to original values —
   ``text`` (answer text), ``arguments`` (a tool call's JSON arguments, JSON-escaped), or
   ``stream`` (a streamed text tail: restores what is safe now and returns the tail to hold
@@ -97,6 +99,9 @@ async def chat_mask(request: Request) -> dict[str, Any]:
         raise InvalidChatRequestError("request body is not valid JSON") from None
     if not isinstance(body, dict):
         raise InvalidChatRequestError("request body must be a JSON object")
+    # A preview of a draft: masked in a fork of the session, so the placeholders are the ones a
+    # send would print, and nothing is registered unless the message is sent.
+    dry = bool(body.pop("dry", False))
     body.setdefault("model", "gpt-4o")
     request.state.pii_guard_request_id = new_request_id()
     timer = RequestTimer(received_at)
@@ -127,6 +132,7 @@ async def chat_mask(request: Request) -> dict[str, Any]:
             trace=trace,
             stats=stats,
             check_payload=lambda _payload, _images: None,
+            dry=dry,
         )
         return (session, payload), stats
 

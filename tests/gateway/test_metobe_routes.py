@@ -112,3 +112,20 @@ def test_unknown_session_label_is_left_as_written(client: TestClient) -> None:
         client, "metobe_m5", [{"kind": "text", "text": "Привет, Персона_Женщина_1a2b3c."}]
     )
     assert items[0]["text"] == "Привет, Персона_Женщина_1a2b3c."
+
+
+def test_dry_run_prints_the_send_labels_and_registers_nothing(client: TestClient) -> None:
+    draft = [{"role": "user", "content": f"Передай Ольге Петровне, почта {EMAIL}."}]
+    response = client.post(
+        "/s/metobe_m6/v1/chat/mask", json={"messages": draft, "dry": True}, headers=RU
+    )
+    assert response.status_code == 200, response.text
+    preview = response.json()
+    email = next(e["placeholder"] for e in preview["entities"] if e["type"] == "EMAIL")
+    # Nothing was registered: the session cannot restore the draft's placeholder yet.
+    assert _restore(client, "metobe_m6", [{"kind": "text", "text": email}])[0]["text"] == email
+    sent = _mask(client, "metobe_m6", draft)
+    assert {e["placeholder"] for e in sent["entities"]} == {
+        e["placeholder"] for e in preview["entities"]
+    }
+    assert _restore(client, "metobe_m6", [{"kind": "text", "text": email}])[0]["text"] == EMAIL

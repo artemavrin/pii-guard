@@ -379,21 +379,25 @@ async def mask_chat_request(
     trace: CallTrace,
     stats: RequestStats,
     check_payload: Callable[[bytes, int], None],
+    dry: bool = False,
 ) -> tuple[VaultSession, bytes, list[list[Span]], float]:
     session, created = gateway.session(headers, body, path_session, stats, trace)
+    # A dry run (Metobe's preview of a draft) masks in a fork: the same placeholders, and nothing
+    # reaches the session unless the message is sent.
+    working = session.fork() if dry else session
     stats.texts = len(collected.slots)
     stats.images = len(collected.images)
     timer.add("parse", time.perf_counter() - timer.started)
     kept: list[list[Span]] = []
     try:
         stats.opaque_stripped = strip_unverified(
-            session, "chat", collected, lambda: collect_texts(body)
+            working, "chat", collected, lambda: collect_texts(body)
         )
         stats.texts = len(collected.slots)
         stats.images = len(collected.images)
         with timer.span("detect"):
             spans = await gateway.detect_all(
-                collected.slots, detector, session, language, stats, kept
+                collected.slots, detector, working, language, stats, kept
             )
             names = tool_names(body)
             spans = without_tool_names(
@@ -402,35 +406,35 @@ async def mask_chat_request(
                 names,
                 [slot.kind for slot in collected.slots],
             )
-            issued = gateway.issued_ids.of(session.session_id)
+            issued = gateway.issued_ids.of(working.session_id)
             spans = without_opaque_ids(collected.slots, spans, issued)
-        generation = session.generation
-        before = _counts_of(session)
+        generation = working.generation
+        before = _counts_of(working)
         with timer.span("mask"):
-            masked = gateway.mask(collected.slots, spans, session, language)
-        _count_masked(stats, before, session)
+            masked = gateway.mask(collected.slots, spans, working, language)
+        _count_masked(stats, before, working)
         if collected.images:
             with timer.span("image"):
-                await gateway.mask_images(collected.images, detector, language, stats, session)
-        before = _counts_of(session)
+                await gateway.mask_images(collected.images, detector, language, stats, working)
+        before = _counts_of(working)
         with timer.span("mask"):
             remask = bool(collected.images)
             gateway.write(
-                collected.slots, masked, session, language, remask, generation, names, issued
+                collected.slots, masked, working, language, remask, generation, names, issued
             )
             collected.finalize()
-        _count_masked(stats, before, session)
+        _count_masked(stats, before, working)
         with timer.span("mask"):
-            gateway.recheck(body, collect_texts, session, language, stats, names, issued)
+            gateway.recheck(body, collect_texts, working, language, stats, names, issued)
         forwarding = time.perf_counter()
-        payload = gateway.forwarded(body, session, stats, add_chat_note)
+        payload = gateway.forwarded(body, working, stats, add_chat_note)
         check_payload(payload, stats.image_payload_bytes)
     except BaseException:
         stats.log("blocked")
         gateway.release_session(session, created, masked=False)
         raise
-    gateway.release_session(session, created, masked=True)
-    return session, payload, kept, forwarding
+    gateway.release_session(session, created, masked=not dry)
+    return working, payload, kept, forwarding
 
 
 async def check_chat_upstream(
