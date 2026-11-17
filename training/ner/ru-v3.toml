@@ -1,0 +1,83 @@
+# NER ru-v3: ru-v2's recipe (v4.2 + Russian corpus + OpenPII replay in 23 languages) plus ~180
+# Russian documents aimed at what ru-v2 got wrong on the closed eval2 set (eval/generated/ru/eval2,
+# never trained on): numbers and streets next to addresses, look-alike reference numbers, initials,
+# diminutives, short surnames and name-like words. Own name pools 217-219. Fictional data only.
+#   docs/ru/corpus/build.py build eval/generated/ru-corpus/ru-v3-add.jsonl eval/generated/ru/raw/v3_*.jsonl
+# Both Russian training files are listed four times.
+
+base_model = "watt-mind/pii-guard-ner-xlmr-base"   # v4.2, Apache-2.0
+base_revision = "33ef18fed56abd06e8caeb4ad0268633d5346ed5"
+train = [
+  "eval/generated/ru-corpus/ru-v3-add.jsonl",
+  "eval/generated/ru-corpus/ru-v3-add.jsonl",
+  "eval/generated/ru-corpus/ru-v3-add.jsonl",
+  "eval/generated/ru-corpus/ru-v3-add.jsonl",
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/replay2/bg-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/cs-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/da-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/de-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/el-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/en-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/es-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/et-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/fi-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/fr-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/hr-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/hu-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/it-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/lt-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/lv-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/nl-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/pl-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/pt-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/ro-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/sk-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/sl-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/sr-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay2/sv-openpii-train.jsonl",
+]
+dev = [
+  "eval/generated/ru-corpus/ru-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/bg-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/cs-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/da-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/de-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/el-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/en-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/es-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/et-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/fi-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/fr-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/hr-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/hu-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/it-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/lt-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/lv-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/nl-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/pl-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/pt-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/ro-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/sk-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/sl-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/sr-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay2/sv-openpii-dev.jsonl",
+]
+report_dev = ["eval/generated/ru-corpus/ru-holdout.jsonl"]
+out = "models/ner/pii-guard-ner-xlmr-base-ru-v3"
+teacher = "none"
+epochs = 2
+batch_size = 16
+lr = 2e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+save_epochs = true

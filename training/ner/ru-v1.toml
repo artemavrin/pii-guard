@@ -1,0 +1,42 @@
+# NER ru-v1: the published v4.2 (watt-mind/pii-guard-ner-xlmr-base @ 33ef18fe) fine-tuned on the
+# Russian corpus written by Claude (docs/ru/corpus/SPEC.md), with hu/en/de OpenPII rows replayed so
+# the other languages are not forgotten. Fictional / synthetic data only.
+#
+# Data (eval/generated/, not committed):
+#   docs/ru/corpus/build.py build ...            -> ru-corpus/{ru-train,ru-dev,ru-holdout}.jsonl
+#   training/ner/openpii.py --train hu=1500,en=1500,de=1500 --dev hu=150,en=150,de=150
+#                                                -> ru-corpus/replay/
+# The Russian training file is listed three times (upsampling: ~2.7k ru vs 4.5k replay rows).
+# ru-holdout (holdout_901/902, own name pools) is report-only: it never picks the checkpoint.
+
+base_model = "watt-mind/pii-guard-ner-xlmr-base"   # v4.2, Apache-2.0
+base_revision = "33ef18fed56abd06e8caeb4ad0268633d5346ed5"
+train = [
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/ru-train.jsonl",
+  "eval/generated/ru-corpus/replay/hu-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay/en-openpii-train.jsonl",
+  "eval/generated/ru-corpus/replay/de-openpii-train.jsonl",
+]
+dev = [
+  "eval/generated/ru-corpus/ru-dev.jsonl",
+  "eval/generated/ru-corpus/replay/hu-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay/en-openpii-dev.jsonl",
+  "eval/generated/ru-corpus/replay/de-openpii-dev.jsonl",
+]
+report_dev = ["eval/generated/ru-corpus/ru-holdout.jsonl"]
+out = "models/ner/pii-guard-ner-xlmr-base-ru-v1"
+teacher = "none"
+epochs = 3
+batch_size = 16
+lr = 2e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+save_epochs = true
