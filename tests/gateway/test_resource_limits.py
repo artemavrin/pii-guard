@@ -275,3 +275,35 @@ def test_ensure_connected_refuses_a_gone_client() -> None:
     with pytest.raises(common.ClientDisconnectedError) as caught:
         asyncio.run(common.ensure_connected(Gone()))  # type: ignore[arg-type]
     assert caught.value.status_code == 499
+
+
+def test_a_detection_past_its_timeout_fills_the_cache_for_the_retry() -> None:
+    """A long conversation on a slow host (Metobe, 2 CPUs): the first request times out, the
+    detection runs on, a retry meanwhile waits for it instead of starting it again, and the
+    retry after it is answered from the cache."""
+    llm = FakeLlm(delay=0.6)
+    app = make_app(MockUpstream(), llm=llm, config=GatewayConfig(detection_timeout=0.2))
+    path = "/s/long-chat" + CHAT
+    body = {
+        "model": "m",
+        "messages": [{"role": "user", "content": "üzenet: teszt.elek@example.com"}],
+    }
+    audit = {"X-PII-Guard-Mode": "audit"}
+
+    async def main() -> tuple[list[int], list[int]]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as client:
+            first = await client.post(path, json=body, headers=audit)
+            calls = [llm.calls]
+            during = await client.post(path, json=body, headers=audit)
+            calls.append(llm.calls)
+            await asyncio.sleep(0.8)
+            calls.append(llm.calls)
+            after = await client.post(path, json=body, headers=audit)
+            calls.append(llm.calls)
+            return [first.status_code, during.status_code, after.status_code], calls
+
+    statuses, calls = asyncio.run(main())
+    assert statuses == [503, 503, 200]
+    # The retry joined the detection still running, and the last one was answered from the cache.
+    assert calls[0] == calls[1] == calls[2] == calls[3]

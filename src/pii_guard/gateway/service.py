@@ -40,7 +40,7 @@ from starlette.responses import Response
 
 from pii_guard.config import Settings
 from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, widen_request
-from pii_guard.gateway.cache import DetectionCache
+from pii_guard.gateway.cache import CacheKey, DetectionCache
 from pii_guard.gateway.chat import (
     ECHO_HEADER,
     LANGUAGE_HEADER,
@@ -224,6 +224,10 @@ class Gateway:
         self._client: httpx.AsyncClient | None = None
         self._client_loop: asyncio.AbstractEventLoop | None = None
         self._detect_workers: dict[Mode, BoundedWorkers] = {}
+        # Detections that outlived their request's timeout, by cache key: they run on, fill the
+        # cache, and keep their session, so a retry of a long conversation on a slow host goes
+        # through instead of timing out again (and waits for them instead of doubling the work).
+        self._late: dict[CacheKey, tuple[asyncio.Future[Any], int]] = {}
         self._image_workers = image_workers
         self._sam = sam
         self._ocr = ocr
@@ -503,6 +507,9 @@ class Gateway:
             del self._session_holds[session_id]
             if not hold.refused_creator or hold.kept:
                 return
+            if any(key[0] == session_id for key in self._late):
+                # Its detection outlived the request: kept for the retry (:meth:`_run_late`).
+                return
             self.vault.drop(session_id)
             self.cache.drop_session(session_id)
             self.issued_ids.drop(session_id)
@@ -629,6 +636,61 @@ class Gateway:
             pending[key[1]] = (slot.text, [index], key)
         return results, pending
 
+    def _joinable(
+        self, jobs: list[tuple[str, list[int], Any]], loop: asyncio.AbstractEventLoop
+    ) -> dict[CacheKey, tuple[asyncio.Future[Any], int]]:
+        """The texts a late detection (:meth:`_run_late`) still works on: waited for, not
+        detected again."""
+        joined = {}
+        for _, _, key in jobs:
+            late = self._late.get(key)
+            if late is not None and late[0].get_loop() is loop:
+                joined[key] = late
+        return joined
+
+    def _run_late(self, task: asyncio.Future[Any], keys: list[CacheKey]) -> None:
+        """Lets a timed-out detection finish: its spans go to the cache, its keys stay joinable
+        and its session kept (:meth:`release_session`) until it ends."""
+        for index, key in enumerate(keys):
+            self._late[key] = (task, index)
+
+        def done(finished: asyncio.Future[Any]) -> None:
+            outputs = None
+            if not finished.cancelled() and finished.exception() is None:
+                outputs = finished.result()
+            for index, key in enumerate(keys):
+                if outputs is not None:
+                    self.cache.put(key, outputs[index][0])
+                if self._late.get(key) == (task, index):
+                    del self._late[key]
+
+        task.add_done_callback(done)
+
+    async def _detect_or_join(
+        self,
+        jobs: list[tuple[str, list[int], Any]],
+        workers: BoundedWorkers,
+        detector: ModeDetector,
+        language: str,
+    ) -> list[tuple[list[Span], dict[str, float]]]:
+        """The spans of each job's text: detected now, or awaited from a late detection."""
+        joined = self._joinable(jobs, asyncio.get_running_loop())
+        fresh = [job for job in jobs if job[2] not in joined]
+        texts = [text for text, _, _ in fresh]
+        outputs: list[tuple[list[Span], dict[str, float]]] = []
+        if texts and detector.batches:
+            found, timings = await workers.run(detector.resolve_many, texts, language)
+            outputs = [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
+        elif texts:
+            outputs = await asyncio.gather(
+                *(workers.run(detector.resolve, text, language) for text in texts)
+            )
+        by_key = {job[2]: out for job, out in zip(fresh, outputs, strict=True)}
+        for key, (task, index) in joined.items():
+            # Shielded: this request giving up must not cancel another's late detection.
+            by_key[key] = (await asyncio.shield(task))[index]
+        return [by_key[key] for _, _, key in jobs]
+
     async def _run_pending_detections(
         self,
         pending: dict[bytes, tuple[str, list[int], Any]],
@@ -644,24 +706,24 @@ class Gateway:
             )
             self._detect_workers[detector.mode] = workers
 
-        async def run(text: str) -> tuple[list[Span], dict[str, float]]:
-            return await workers.run(detector.resolve, text, language)
-
-        async def run_all(texts: list[str]) -> list[tuple[list[Span], dict[str, float]]]:
-            found, timings = await workers.run(detector.resolve_many, texts, language)
-            return [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
-
         started = time.perf_counter()
+        loop = asyncio.get_running_loop()
         jobs = list(pending.values())
-        texts = [text for text, _, _ in jobs]
-        work = run_all(texts) if detector.batches else asyncio.gather(*map(run, texts))
+        fresh_work = loop.create_task(self._detect_or_join(jobs, workers, detector, language))
         try:
-            outputs = await asyncio.wait_for(work, timeout=self.config.detection_timeout)
+            outputs = await asyncio.wait_for(
+                asyncio.shield(fresh_work), timeout=self.config.detection_timeout
+            )
         except TimeoutError:
+            self._run_late(fresh_work, [key for _, _, key in jobs])
             raise DetectionError(
                 f"detection timed out after {self.config.detection_timeout:g}s "
                 f"({detector.mode.value} mode)"
             ) from None
+        except asyncio.CancelledError:
+            # The caller went away: what has not started is dropped, as before.
+            fresh_work.cancel()
+            raise
         except PiiGuardError:
             raise
         except Exception as exc:
